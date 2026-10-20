@@ -1,0 +1,116 @@
+helwan-penguin/
+📁 helwan-penguin/
+├── 📄 .gitignore
+├── 📄 LICENSE
+├── 📄 Makefile
+├── 📄 README.md
+├── 📁 assets
+│   ├── 📁 audio
+│   │   ├── 📁 music
+│   │   │   └── 📄 .gitkeep
+│   │   └── 📁 sounds
+│   │       └── 📄 .gitkeep
+│   ├── 📁 fonts
+│   │   └── 📄 .gitkeep
+│   └── 📁 images
+│       ├── 📁 enemies
+│       │   └── 📄 .gitkeep
+│       ├── 📁 items
+│       │   └── 📄 .gitkeep
+│       ├── 📁 player
+│       │   └── 📄 .gitkeep
+│       ├── 📁 ui
+│       │   └── 📄 .gitkeep
+│       └── 📁 worlds
+│           └── 📄 .gitkeep
+├── 📁 cmd
+│   └── 📁 helwan-penguin
+│       ├── 📄 icon.png
+│       └── 📄 main.go
+├── 📁 data
+│   ├── 📁 levels
+│   │   └── 📄 .gitkeep
+│   └── 📁 localization
+│       └── 📄 en.json
+├── 📄 go.mod
+├── 📄 go.sum
+├── 📁 internal
+│   ├── 📁 audio
+│   │   ├── 📄 audio.go
+│   │   ├── 📄 boss.wav
+│   │   ├── 📄 collect.wav
+│   │   ├── 📄 hit.wav
+│   │   ├── 📄 jump.wav
+│   │   ├── 📄 level.wav
+│   │   ├── 📄 stomp.wav
+│   │   └── 📄 win.wav
+│   ├── 📁 config
+│   │   └── 📄 config.go
+│   ├── 📁 enemies
+│   │   ├── 📄 enemy.go
+│   │   └── 📄 movement.go
+│   ├── 📁 game
+│   │   ├── 📄 camera.go
+│   │   ├── 📄 game.go
+│   │   ├── 📄 helpers.go
+│   │   ├── 📄 input.go
+│   │   └── 📄 state.go
+│   ├── 📁 graphics
+│   │   ├── 📄 animation.go
+│   │   ├── 📄 backgrounds.go
+│   │   ├── 📄 collectible.go
+│   │   ├── 📄 effects.go
+│   │   ├── 📄 enemy.go
+│   │   ├── 📄 ghost.go
+│   │   ├── 📄 goal.go
+│   │   ├── 📄 graphics.go
+│   │   ├── 📄 hazard.go
+│   │   ├── 📄 hud.go
+│   │   ├── 📄 penguin.go
+│   │   └── 📄 platform.go
+│   ├── 📁 items
+│   │   ├── 📄 effects.go
+│   │   └── 📄 item.go
+│   ├── 📁 levels
+│   │   ├── 📄 levels.go
+│   │   ├── 📄 world01.go
+│   │   ├── 📄 world02.go
+│   │   ├── 📄 world03.go
+│   │   ├── 📄 world04.go
+│   │   ├── 📄 world05.go
+│   │   ├── 📄 world06.go
+│   │   └── 📄 world07.go
+│   ├── 📁 player
+│   │   ├── 📄 collision.go
+│   │   ├── 📄 movement.go
+│   │   └── 📄 player.go
+│   ├── 📁 progress
+│   │   ├── 📄 progress.go
+│   │   └── 📄 save.go
+│   ├── 📁 ui
+│   │   ├── 📄 hud.go
+│   │   ├── 📄 menu.go
+│   │   ├── 📄 pause.go
+│   │   ├── 📄 results.go
+│   │   └── 📄 settings.go
+│   └── 📁 world
+│       ├── 📄 checkpoint.go
+│       ├── 📄 collectible.go
+│       ├── 📄 hazard.go
+│       ├── 📄 platform.go
+│       ├── 📄 tile.go
+│       └── 📄 world.go
+├── 📁 packaging
+│   ├── 📁 arch
+│   │   ├── 📄 .gitkeep
+│   │   └── 📄 PKGBUILD
+│   ├── 📄 helwan-penguin.desktop
+│   ├── 📄 helwan-penguin.png
+│   └── 📁 windows
+│       └── 📄 .gitkeep
+├── 📄 penguin-diagram.txt
+└── 📁 tests
+    ├── 📄 collision_test.go
+    ├── 📄 levels_test.go
+    ├── 📄 player_test.go
+    └── 📄 progress_test.go
