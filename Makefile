@@ -1,11 +1,15 @@
-APP=helwan-penguin
+APP = helwan-penguin
 
-.PHONY: run build test clean
-run:
-	go run ./cmd/helwan-penguin
+.PHONY: build test run clean
+
 build:
-	go build -o $(APP) ./cmd/helwan-penguin
+	go build -o bin/$(APP) ./cmd/helwan-penguin
+
 test:
 	go test ./...
+
+run:
+	go run ./cmd/helwan-penguin
+
 clean:
-	rm -f $(APP) $(APP).exe
+	rm -rf bin
