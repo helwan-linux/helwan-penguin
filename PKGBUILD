@@ -1,31 +1,48 @@
 
 pkgname=penguin
-pkgver=0.1.0
+pkgver=1.0
 pkgrel=1
 pkgdesc="Helwan Penguin platform game"
 arch=('x86_64')
 url="https://github.com/helwan-linux/helwan-penguin"
 license=('GPL-3.0-or-later')
-depends=('glibc' 'gcc-libs' 'alsa-lib' 'mesa' 'libx11' 'libxcursor' 'libxrandr' 'libxinerama' 'libxi' 'libgl')
-makedepends=('go' 'git' 'pkgconf')
 
-source=("git+https://github.com/helwan-linux/helwan-penguin.git")
+depends=(
+    'glibc'
+    'gcc-libs'
+    'alsa-lib'
+    'mesa'
+    'libx11'
+    'libxcursor'
+    'libxrandr'
+    'libxinerama'
+    'libxi'
+    'libgl'
+)
+
+makedepends=(
+    'go'
+    'git'
+    'pkgconf'
+)
+
+source=("git+https://github.com/helwan-linux/helwan-penguin.git#branch=main")
 sha256sums=('SKIP')
 
 pkgver() {
     cd "$srcdir/helwan-penguin"
-    printf '0.1.0.r%s.%s' \
-        "$(git rev-list --count HEAD)" \
-        "$(git rev-parse --short HEAD)"
+
+    printf '1.%s' "$(git rev-list --count HEAD)"
 }
 
 build() {
     cd "$srcdir/helwan-penguin"
 
     export CGO_ENABLED=1
-    export GOFLAGS="-buildmode=pie"
 
-    go build -trimpath \
+    go build \
+        -trimpath \
+        -buildmode=pie \
         -ldflags="-s -w" \
         -o penguin \
         ./cmd/helwan-penguin
