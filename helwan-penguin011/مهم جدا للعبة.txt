@@ -1,0 +1,35 @@
+لو عايز تمسح ملفات البناء القديمة وتبني لعبة Helwan Penguin من جديد، استخدم الأوامر التالية من داخل مجلد المشروع.
+
+
+ويندوز (CMD)
+cd C:\Users\saeed\Desktop\helwan-penguin008
+
+del /q helwan-penguin.exe 2>nul
+go clean -cache
+go mod tidy
+go test ./...
+go build -o helwan-penguin.exe ./cmd/helwan-penguin
+
+
+لتشغيل اللعبة:
+helwan-penguin.exe
+
+
+لينكس (Bash)
+cd ~/Desktop/helwan-penguin008
+
+rm -f helwan-penguin
+go clean -cache
+go mod tidy
+go test ./...
+go build -o helwan-penguin ./cmd/helwan-penguin
+
+
+لتشغيل اللعبة:
+./helwan-penguin
+
+
+مهم: go clean -cache يمسح ذاكرة البناء المؤقتة، وليس ملفات مشروعك. أما go build فيعيد إنشاء الملف التنفيذي من الكود الحالي. 
+لا تحتاج لحذف ملفات المصدر أو go.mod أو go.sum.
+
+لو تريد أيضًا بناء نسخة نظيفة للنظام الآخر، ابنِها على النظام المستهدف نفسه؛ خصوصًا أن Ebiten قد يحتاج مكتبات نظام خاصة بكل منصة.
