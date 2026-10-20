@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Helwan Penguin
-Comment=An adventurous penguin platform game
-Exec=helwan-penguin
-Icon=helwan-penguin
-Terminal=false
-Categories=Game;ArcadeGame;
-StartupNotify=true
