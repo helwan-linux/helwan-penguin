@@ -1,5 +1,5 @@
-helwan-penguin/
-📁 helwan-penguin/
+
+https://github.com/helwan-linux/helwan-penguin
 ├── 📄 .gitignore
 ├── 📄 LICENSE
 ├── 📄 Makefile
