@@ -1,11 +1,10 @@
-
 pkgname=penguin
 pkgver=1.0
 pkgrel=1
 pkgdesc="Helwan Penguin platform game"
 arch=('x86_64')
 url="https://github.com/helwan-linux/helwan-penguin"
-license=('GPL-3.0-or-later')
+license=('MIT')
 
 depends=(
     'glibc'
@@ -28,12 +27,6 @@ makedepends=(
 
 source=("git+https://github.com/helwan-linux/helwan-penguin.git#branch=main")
 sha256sums=('SKIP')
-
-pkgver() {
-    cd "$srcdir/helwan-penguin"
-
-    printf '1.%s' "$(git rev-list --count HEAD)"
-}
 
 build() {
     cd "$srcdir/helwan-penguin"
@@ -59,4 +52,16 @@ package() {
 
     install -Dm644 packaging/helwan-penguin.desktop \
         "$pkgdir/usr/share/applications/penguin.desktop"
+
+    sed -i \
+        -e 's/^Exec=.*/Exec=penguin/' \
+        -e 's/^Icon=.*/Icon=penguin/' \
+        "$pkgdir/usr/share/applications/penguin.desktop"
+
+    grep -q '^Exec=' "$pkgdir/usr/share/applications/penguin.desktop" || \
+        echo 'Exec=penguin' >> "$pkgdir/usr/share/applications/penguin.desktop"
+
+    grep -q '^Icon=' "$pkgdir/usr/share/applications/penguin.desktop" || \
+        echo 'Icon=penguin' >> "$pkgdir/usr/share/applications/penguin.desktop"
 }
+
