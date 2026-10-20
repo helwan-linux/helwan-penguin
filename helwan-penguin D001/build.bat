@@ -1,4 +1,3 @@
-```bat
 @echo off
 setlocal
 chcp 65001 >nul
@@ -8,7 +7,7 @@ cd /d "%~dp0"
 
 echo.
 echo ========================================
-echo       Helwan Penguin Build System
+echo        Helwan Penguin Build System
 echo ========================================
 echo.
 
@@ -28,20 +27,19 @@ if errorlevel 1 goto error
 
 echo.
 echo [4/4] Building Windows executable...
-if not exist "dist" mkdir "dist"
 
 set GOOS=windows
 set GOARCH=amd64
 set CGO_ENABLED=1
 
-go build -trimpath -o "dist\HelwanPenguin.exe" ./cmd/helwan-penguin
+go build -trimpath -o "packaging\windows\HelwanPenguin.exe" ./cmd/helwan-penguin
 if errorlevel 1 goto error
 
 echo.
 echo ========================================
 echo BUILD SUCCESSFUL
 echo Executable:
-echo %CD%\dist\HelwanPenguin.exe
+echo %CD%\packaging\windows\HelwanPenguin.exe
 echo ========================================
 echo.
 pause
@@ -52,4 +50,3 @@ echo.
 echo BUILD FAILED. Check the error messages above.
 pause
 exit /b 1
-```
