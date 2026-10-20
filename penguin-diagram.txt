@@ -1,35 +1,13 @@
-
 https://github.com/helwan-linux/helwan-penguin
-├── 📄 .gitignore
 ├── 📄 LICENSE
 ├── 📄 Makefile
+├── 📄 PKGBUILD
 ├── 📄 README.md
-├── 📁 assets
-│   ├── 📁 audio
-│   │   ├── 📁 music
-│   │   │   └── 📄 .gitkeep
-│   │   └── 📁 sounds
-│   │       └── 📄 .gitkeep
-│   ├── 📁 fonts
-│   │   └── 📄 .gitkeep
-│   └── 📁 images
-│       ├── 📁 enemies
-│       │   └── 📄 .gitkeep
-│       ├── 📁 items
-│       │   └── 📄 .gitkeep
-│       ├── 📁 player
-│       │   └── 📄 .gitkeep
-│       ├── 📁 ui
-│       │   └── 📄 .gitkeep
-│       └── 📁 worlds
-│           └── 📄 .gitkeep
 ├── 📁 cmd
 │   └── 📁 helwan-penguin
 │       ├── 📄 icon.png
 │       └── 📄 main.go
 ├── 📁 data
-│   ├── 📁 levels
-│   │   └── 📄 .gitkeep
 │   └── 📁 localization
 │       └── 📄 en.json
 ├── 📄 go.mod
@@ -101,13 +79,8 @@ https://github.com/helwan-linux/helwan-penguin
 │       ├── 📄 tile.go
 │       └── 📄 world.go
 ├── 📁 packaging
-│   ├── 📁 arch
-│   │   ├── 📄 .gitkeep
-│   │   └── 📄 PKGBUILD
 │   ├── 📄 helwan-penguin.desktop
-│   ├── 📄 helwan-penguin.png
-│   └── 📁 windows
-│       └── 📄 .gitkeep
+│   └── 📄 helwan-penguin.png
 ├── 📄 penguin-diagram.txt
 └── 📁 tests
     ├── 📄 collision_test.go
