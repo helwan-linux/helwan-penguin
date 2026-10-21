@@ -16,7 +16,7 @@ import (
 const (
 	screenWidth, screenHeight = 960, 540
 	maxAttempts               = 5
-	maxLevel                  = 35
+	maxLevel                  = 45
 )
 
 type Game struct {
@@ -33,6 +33,11 @@ type Game struct {
 	saveError  string
 	infoPage   string
 	infoReturn State
+
+	tutorial      bool
+	tutorialWorld int
+	message       string
+	messageFrames int
 }
 
 func New() *Game {
@@ -66,8 +71,15 @@ func (g *Game) startLevel(level int) {
 	if level > maxLevel {
 		level = maxLevel
 	}
+
 	g.attempts = maxAttempts
 	g.resetCurrentLevel(level)
+
+	worldNumber := (level-1)/5 + 1
+	if level%5 == 1 && (worldNumber == 8 || worldNumber == 9) {
+		g.tutorial = true
+		g.tutorialWorld = worldNumber
+	}
 }
 
 func (g *Game) resetCurrentLevel(level int) {
@@ -79,11 +91,15 @@ func (g *Game) resetCurrentLevel(level int) {
 	g.camera = Camera{}
 	g.animation = graphics.NewPenguinAnimation()
 	g.state = StatePlaying
+	g.message = ""
+	g.messageFrames = 0
 }
 
 func (g *Game) startNewGame() {
 	g.save = progress.Default()
 	g.score = 0
+	g.tutorial = false
+	g.tutorialWorld = 0
 	g.saveProgress()
 	g.startLevel(1)
 }
@@ -109,9 +125,14 @@ func justPressed(key ebiten.Key) bool {
 
 func updateKeyHistory() {
 	keys := []ebiten.Key{
-		ebiten.KeyEnter, ebiten.KeyEscape, ebiten.KeyP,
-		ebiten.KeySpace, ebiten.KeyN, ebiten.KeyO,
+		ebiten.KeyEnter,
+		ebiten.KeyEscape,
+		ebiten.KeyP,
+		ebiten.KeySpace,
+		ebiten.KeyN,
+		ebiten.KeyO,
 		ebiten.KeyH,
+		ebiten.KeyF,
 	}
 	for _, key := range keys {
 		previousKeys[key] = ebiten.IsKeyPressed(key)
@@ -135,6 +156,43 @@ func (g *Game) playSound(name string) {
 func (g *Game) openInfo(page string) {
 	g.infoReturn = g.state
 	g.infoPage = page
+}
+
+func (g *Game) showMessage(message string) {
+	g.message = message
+	g.messageFrames = 150
+}
+
+func (g *Game) fireWeapon() {
+	if g.world.Number != 8 && g.world.Number != 9 {
+		return
+	}
+
+	if g.score < world.ProjectileCost {
+		g.showMessage("Not enough points! Need 20 points to shoot.")
+		return
+	}
+
+	direction := float64(g.animation.Facing)
+	if direction == 0 {
+		direction = 1
+	}
+
+	x := g.player.X + g.player.Width/2
+	if direction < 0 {
+		x -= 18
+	}
+
+	y := g.player.Y + g.player.Height*0.45
+
+	if g.world.FireProjectile(x, y, direction) {
+		g.score -= world.ProjectileCost
+		if g.world.Number == 8 {
+			g.playSound("shoot")
+		} else {
+			g.playSound("water")
+		}
+	}
 }
 
 func (g *Game) completeLevel() {
@@ -163,6 +221,13 @@ func (g *Game) Update() error {
 
 	if g.background != nil {
 		g.background.Update()
+	}
+
+	if g.messageFrames > 0 {
+		g.messageFrames--
+		if g.messageFrames == 0 {
+			g.message = ""
+		}
 	}
 
 	if g.infoPage != "" {
@@ -267,10 +332,53 @@ func (g *Game) Update() error {
 		return nil
 	}
 
+	// World tutorials pause gameplay until the player confirms.
+	if g.tutorial {
+		if justPressed(ebiten.KeyEnter) ||
+			justPressed(ebiten.KeySpace) {
+			g.tutorial = false
+		}
+		return nil
+	}
+
+	// Remember ghost health so each defeated ghost costs 60 points.
+	previousGhostHealth := make([]int, len(g.world.Enemies))
+	for i := range g.world.Enemies {
+		if g.world.Enemies[i].Ghost {
+			previousGhostHealth[i] = g.world.Enemies[i].Health
+		}
+	}
+
 	g.world.Update(&g.player)
+
+	for i := range g.world.Enemies {
+		e := &g.world.Enemies[i]
+		if previousGhostHealth[i] > 0 &&
+			e.Ghost &&
+			e.Health <= 0 {
+			g.score -= world.GhostKillCost
+		}
+		if previousGhostHealth[i] > 0 &&
+			e.Stone {
+			g.score -= world.GhostKillCost
+		}
+	}
+
+	if justPressed(ebiten.KeyF) {
+		g.fireWeapon()
+	}
+
 	previousBottom := g.player.Y + g.player.Height
 	wasOnGround := g.player.OnGround
+	oldPlayerX := g.player.X
 	g.player.Update()
+
+	// Gas slows horizontal movement for five seconds.
+	movementMultiplier := g.world.MovementMultiplier()
+	if movementMultiplier < 1 {
+		g.player.X = oldPlayerX +
+			(g.player.X-oldPlayerX)*movementMultiplier
+	}
 
 	if wasOnGround && g.player.VY < 0 {
 		g.playSound("jump")
@@ -290,6 +398,13 @@ func (g *Game) Update() error {
 		return nil
 	}
 
+	// Touching a green stone in world 9 is fatal.
+	if g.world.StoneAt(g.player.X, g.player.Y,
+		g.player.Width, g.player.Height) {
+		g.loseAttempt()
+		return nil
+	}
+
 	starsAfter := g.world.CollectedCount()
 	if starsAfter > starsBefore {
 		g.score += (starsAfter - starsBefore) * 50
@@ -298,17 +413,28 @@ func (g *Game) Update() error {
 
 	for i := range g.world.Enemies {
 		e := &g.world.Enemies[i]
-		if !e.Active {
+		if !e.Active || e.Stone {
 			continue
 		}
-		e.Update()
+
+		// Invisible ghosts cannot be hit or hurt the player.
+		if e.Ghost && e.Invisible {
+			continue
+		}
 
 		overlapsX := g.player.X+g.player.Width > e.X &&
 			g.player.X < e.X+e.Width
 		overlapsY := g.player.Y+g.player.Height > e.Y &&
 			g.player.Y < e.Y+e.Height
+
 		if !overlapsX || !overlapsY {
 			continue
+		}
+
+		// Jumping on a visible ghost is fatal.
+		if e.Ghost {
+			g.loseAttempt()
+			return nil
 		}
 
 		stomped := wasFalling && previousBottom <= e.Y+10
@@ -392,6 +518,26 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		graphics.DrawEnemy(screen, e, g.camera.X)
 	}
 
+	for _, projectile := range g.world.Projectiles {
+		if !projectile.Active {
+			continue
+		}
+
+		projectileColor := color.RGBA{R: 255, G: 100, B: 30, A: 255}
+		if projectile.Water {
+			projectileColor = color.RGBA{R: 50, G: 180, B: 255, A: 255}
+		}
+
+		ebitenutil.DrawRect(
+			screen,
+			projectile.X-g.camera.X,
+			projectile.Y,
+			projectile.Width,
+			projectile.Height,
+			projectileColor,
+		)
+	}
+
 	for _, c := range g.world.Collectibles {
 		graphics.DrawCollectible(screen, c, g.camera.X)
 	}
@@ -438,10 +584,33 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case StateGameWon:
 		graphics.DrawOverlay(screen, "CONGRATULATIONS!",
 			"YOU FINISHED HELWAN PENGUIN!",
-			"All 35 levels complete - Press ENTER")
+			"All 45 levels complete - Press ENTER")
 
 	default:
 		graphics.DrawControls(screen)
+	}
+
+	if g.world.Number == 9 && g.world.GasFrames > 0 {
+		ebitenutil.DebugPrintAt(screen,
+			"VOLCANIC GAS: SLOW MOVEMENT", 330, 48)
+	}
+
+	if g.message != "" {
+		ebitenutil.DebugPrintAt(screen, g.message, 220, 75)
+	}
+
+	if g.tutorial {
+		if g.tutorialWorld == 8 {
+			graphics.DrawOverlay(screen,
+				"WORLD 8: SHADOW REALM",
+				"F: Fireballs cost 20 points each",
+				"Ghosts need 3 hits; jumping on one kills you. ENTER to start")
+		} else if g.tutorialWorld == 9 {
+			graphics.DrawOverlay(screen,
+				"WORLD 9: VOLCANIC FURY",
+				"F: Water spray costs 20 points each",
+				"Ghosts need 3 hits; green stones are deadly. Gas slows you for 5 seconds. ENTER to start")
+		}
 	}
 }
 

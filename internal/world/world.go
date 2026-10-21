@@ -7,6 +7,14 @@ import (
 	"github.com/helwan-linux/helwan-penguin/internal/player"
 )
 
+const (
+	TotalLevels       = 45
+	GhostHitPoints    = 3
+	ProjectileCost    = 20
+	GhostKillCost     = 60
+	GasDurationFrames = 300
+)
+
 type World struct {
 	Number       int
 	Level        int
@@ -14,8 +22,10 @@ type World struct {
 	Collectibles []Collectible
 	Enemies      []Enemy
 	Hazards      []Hazard
+	Projectiles  []Projectile
 	EndX         float64
 	Frame        float64
+	GasFrames    int
 }
 
 type EnemyKind int
@@ -26,6 +36,7 @@ const (
 	EnemyFlyer
 	EnemyArmored
 	EnemyBoss
+	EnemyGhost
 )
 
 type Enemy struct {
@@ -41,6 +52,20 @@ type Enemy struct {
 	Direction           float64
 	BaseY               float64
 	Phase               float64
+
+	// World 8 and 9 enemy state.
+	Ghost      bool
+	Invisible  bool
+	Stone      bool
+	Visibility float64
+	HitFlash   int
+}
+
+type Projectile struct {
+	X, Y, Width, Height float64
+	VX                  float64
+	Active              bool
+	Water               bool
 }
 
 func (e *Enemy) Update() {
@@ -48,8 +73,39 @@ func (e *Enemy) Update() {
 		return
 	}
 
+	if e.Stone {
+		return
+	}
+
 	if e.Direction == 0 {
 		e.Direction = 1
+	}
+
+	if e.Ghost {
+		e.Phase += 0.045
+		e.Visibility += 1
+
+		// Ghosts alternate between visible and invisible.
+		// Invisible ghosts cannot be hit or hurt the player.
+		e.Invisible = int(e.Visibility/75)%2 == 1
+
+		if e.Patrol > 0 {
+			e.X += e.Speed * e.Direction
+
+			if e.X < e.StartX-e.Patrol {
+				e.X = e.StartX - e.Patrol
+				e.Direction = 1
+			} else if e.X > e.StartX+e.Patrol {
+				e.X = e.StartX + e.Patrol
+				e.Direction = -1
+			}
+		}
+
+		if e.HitFlash > 0 {
+			e.HitFlash--
+		}
+
+		return
 	}
 
 	if e.Boss {
@@ -77,6 +133,12 @@ func (e *Enemy) Update() {
 		case 7:
 			e.Y = e.BaseY + math.Sin(e.Phase*1.4)*42
 			speed *= 0.7 + math.Abs(math.Sin(e.Phase))*1.3
+		case 8:
+			e.Y = e.BaseY + math.Sin(e.Phase*1.7)*22
+			speed *= 1.1
+		case 9:
+			e.Y = e.BaseY - math.Abs(math.Sin(e.Phase))*35
+			speed *= 1.25
 		}
 
 		e.X += speed * e.Direction
@@ -115,8 +177,8 @@ func NewLevel(level int) World {
 	if level < 1 {
 		level = 1
 	}
-	if level > 35 {
-		level = 35
+	if level > TotalLevels {
+		level = TotalLevels
 	}
 
 	worldNumber := (level-1)/5 + 1
@@ -196,6 +258,23 @@ func NewLevel(level int) World {
 			} else if (i+stage)%3 == 0 {
 				p.Kind = PlatformIce
 			}
+
+		case 8:
+			// Shadow Realm: stable platforms; the danger comes from ghosts.
+			if (i+stage)%4 == 2 {
+				p.Kind = PlatformMoving
+				p.MoveRange = 12 + float64(stage*2)
+				p.Speed = 0.4 + float64(stage)*0.04
+				p.MoveVertical = true
+			}
+
+		case 9:
+			// Volcanic Fury: moving platforms above lava.
+			if i%3 == 1 {
+				p.Kind = PlatformMoving
+				p.MoveRange = 10 + float64(stage*3)
+				p.Speed = 0.45 + float64(stage)*0.05
+			}
 		}
 	}
 
@@ -218,6 +297,11 @@ func NewLevel(level int) World {
 
 func (w *World) makeCollectibles(stage int) {
 	w.Collectibles = make([]Collectible, 0, len(w.Platforms))
+
+	// Worlds 8 and 9 have no collectibles. Ammunition is limited.
+	if w.Number >= 8 {
+		return
+	}
 
 	for i, p := range w.Platforms[:len(w.Platforms)-1] {
 		if (i+stage)%4 == 3 {
@@ -242,6 +326,68 @@ func (w *World) makeEnemies(stage int) {
 	w.Enemies = nil
 
 	if w.Level == 1 {
+		return
+	}
+
+	// Worlds 8 and 9 use ghosts with three hit points.
+	if w.Number >= 8 {
+		for i, p := range w.Platforms[1 : len(w.Platforms)-1] {
+			if i%2 == 1 && stage < 2 {
+				continue
+			}
+
+			width, height := 34.0, 36.0
+			health := GhostHitPoints
+			boss := false
+
+			if w.Level%5 == 0 && i == len(w.Platforms[1:len(w.Platforms)-1])-1 {
+				width, height = 62, 62
+				boss = true
+				health = GhostHitPoints
+			}
+
+			w.Enemies = append(w.Enemies, Enemy{
+				X:          p.X + p.W*0.5 - width/2,
+				Y:          p.Y - height,
+				Width:      width,
+				Height:     height,
+				Active:     true,
+				Boss:       boss,
+				Kind:       EnemyGhost,
+				Health:     health,
+				Ghost:      true,
+				StartX:     p.X + p.W*0.5,
+				Patrol:     p.W * 0.3,
+				Speed:      0.45 + float64(stage)*0.08 + float64(w.Number)*0.04,
+				Direction:  1,
+				BaseY:      p.Y - height,
+				Phase:      float64(i+stage) * 0.7,
+				Visibility: float64(i*37 + stage*19),
+			})
+		}
+
+		if w.Level%5 == 0 {
+			p := w.Platforms[len(w.Platforms)-1]
+			w.Enemies = append(w.Enemies, Enemy{
+				X:          p.X + p.W*0.55,
+				Y:          p.Y - 68,
+				Width:      62,
+				Height:     62,
+				Active:     true,
+				Boss:       true,
+				Kind:       EnemyGhost,
+				Health:     GhostHitPoints,
+				Ghost:      true,
+				StartX:     p.X + p.W*0.58,
+				Patrol:     65,
+				Speed:      0.8 + float64(w.Number)*0.08,
+				Direction:  -1,
+				BaseY:      p.Y - 68,
+				Phase:      float64(w.Number) * 0.8,
+				Visibility: float64(w.Number * 23),
+			})
+		}
+
 		return
 	}
 
@@ -393,12 +539,20 @@ func (w *World) makeHazards(stage int) {
 			} else {
 				kind = HazardLaser
 			}
+		case 8:
+			// Shadow Realm gaps are dangerous pits.
+			kind = HazardPit
+		case 9:
+			// Lava fills the gaps in the volcanic world.
+			kind = HazardLava
 		}
 
 		if (i+stage)%3 != 1 ||
 			w.Number == 3 ||
 			w.Number == 5 ||
-			w.Number == 7 {
+			w.Number == 7 ||
+			w.Number == 8 ||
+			w.Number == 9 {
 			y, h := 438.0, 102.0
 
 			if kind == HazardIceSpikes ||
@@ -441,6 +595,10 @@ func (w *World) makeHazards(stage int) {
 				kind = HazardLaser
 			case 6, 7:
 				kind = HazardEnergy
+			case 8:
+				kind = HazardEnergy
+			case 9:
+				kind = HazardLava
 			}
 
 			h := Hazard{
@@ -476,6 +634,10 @@ func (w *World) makeHazards(stage int) {
 				kind = HazardLaser
 			case 6, 7:
 				kind = HazardEnergy
+			case 8:
+				kind = HazardEnergy
+			case 9:
+				kind = HazardFallingRock
 			}
 
 			h := Hazard{
@@ -513,15 +675,70 @@ func (w *World) makeHazards(stage int) {
 					Kind: HazardWind,
 				})
 			}
+
+			// Volcanic vents periodically release gas.
+			if w.Number == 9 && (i+stage)%2 == 0 {
+				w.Hazards = append(w.Hazards, Hazard{
+					X:         p.X + p.W*0.2,
+					Y:         p.Y - 52,
+					W:         p.W * 0.6,
+					H:         48,
+					Kind:      HazardWind,
+					Period:    240,
+					ActiveFor: 55,
+					Phase:     float64(i*41 + w.Level*13),
+				})
+			}
 		}
 	}
 }
 
+// FireProjectile launches one shot in the direction the player is facing.
+// The caller must deduct ProjectileCost from the player's score first.
+func (w *World) FireProjectile(x, y, direction float64) bool {
+	if w.Number != 8 && w.Number != 9 {
+		return false
+	}
+
+	if direction == 0 {
+		direction = 1
+	}
+
+	w.Projectiles = append(w.Projectiles, Projectile{
+		X:      x,
+		Y:      y,
+		Width:  18,
+		Height: 10,
+		VX:     direction * 8,
+		Active: true,
+		Water:  w.Number == 9,
+	})
+
+	return true
+}
+
+// Update advances hazards, enemies, projectiles and moving platforms.
 func (w *World) Update(playerState *player.Player) {
 	w.Frame++
 
+	if w.GasFrames > 0 {
+		w.GasFrames--
+	}
+
 	for i := range w.Hazards {
 		h := &w.Hazards[i]
+
+		if h.Kind == HazardWind &&
+			w.Number == 9 &&
+			h.Period > 0 &&
+			h.ActiveAt(w.Frame) &&
+			playerState != nil &&
+			playerState.X+playerState.Width > h.X &&
+			playerState.X < h.X+h.W &&
+			playerState.Y+playerState.Height > h.Y &&
+			playerState.Y < h.Y+h.H {
+			w.GasFrames = GasDurationFrames
+		}
 
 		if h.Kind != HazardFallingRock || !h.Falling {
 			continue
@@ -533,6 +750,12 @@ func (w *World) Update(playerState *player.Player) {
 			h.Y = h.BaseY
 		}
 	}
+
+	for i := range w.Enemies {
+		w.Enemies[i].Update()
+	}
+
+	w.updateProjectiles()
 
 	for i := range w.Platforms {
 		p := &w.Platforms[i]
@@ -566,6 +789,81 @@ func (w *World) Update(playerState *player.Player) {
 			playerState.Y += p.Y - oldY
 		}
 	}
+}
+
+func (w *World) updateProjectiles() {
+	for i := range w.Projectiles {
+		p := &w.Projectiles[i]
+
+		if !p.Active {
+			continue
+		}
+
+		p.X += p.VX
+
+		if p.X < 0 || p.X > w.EndX+120 {
+			p.Active = false
+			continue
+		}
+
+		for j := range w.Enemies {
+			e := &w.Enemies[j]
+
+			if !e.Active || e.Stone || (e.Ghost && e.Invisible) {
+				continue
+			}
+
+			if p.X+p.Width <= e.X ||
+				p.X >= e.X+e.Width ||
+				p.Y+p.Height <= e.Y ||
+				p.Y >= e.Y+e.Height {
+				continue
+			}
+
+			// Both fire and water need three hits to defeat a ghost.
+			if e.Ghost {
+				e.Health--
+				e.HitFlash = 8
+
+				if e.Health <= 0 {
+					if w.Number == 9 {
+						// A defeated volcanic ghost becomes a deadly stone.
+						e.Stone = true
+						e.Ghost = false
+						e.Kind = EnemyArmored
+						e.Width = 28
+						e.Height = 22
+						e.Y = e.BaseY + e.Height - 22
+						e.Speed = 0
+						e.Patrol = 0
+						e.Invisible = false
+					} else {
+						e.Active = false
+					}
+				}
+			}
+
+			p.Active = false
+			break
+		}
+	}
+
+	active := w.Projectiles[:0]
+	for _, p := range w.Projectiles {
+		if p.Active {
+			active = append(active, p)
+		}
+	}
+	w.Projectiles = active
+}
+
+// MovementMultiplier returns the player movement multiplier during volcanic gas.
+func (w World) MovementMultiplier() float64 {
+	if w.Number == 9 && w.GasFrames > 0 {
+		return 0.45
+	}
+
+	return 1
 }
 
 func (w *World) ResolvePlayer(p *player.Player) {
@@ -634,7 +932,7 @@ func (w World) CollectedCount() int {
 
 func (w World) BossDefeated() bool {
 	for _, e := range w.Enemies {
-		if e.Boss && e.Active {
+		if e.Boss && e.Active && !e.Stone {
 			return false
 		}
 	}
@@ -662,6 +960,23 @@ func (w World) HazardAt(x, y, width, height float64) bool {
 	return false
 }
 
+func (w World) StoneAt(x, y, width, height float64) bool {
+	for _, e := range w.Enemies {
+		if !e.Active || !e.Stone {
+			continue
+		}
+
+		if x+width > e.X &&
+			x < e.X+e.Width &&
+			y+height > e.Y &&
+			y < e.Y+e.Height {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (w *World) ApplyHazardEffects(p *player.Player) {
 	for _, h := range w.Hazards {
 		if p.X+p.Width <= h.X ||
@@ -679,7 +994,9 @@ func (w *World) ApplyHazardEffects(p *player.Player) {
 			}
 
 		case HazardWind:
-			p.X += 0.8
+			if w.Number != 9 {
+				p.X += 0.8
+			}
 		}
 	}
 }

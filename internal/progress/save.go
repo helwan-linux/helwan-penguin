@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const MaxLevel = 35
+const MaxLevel = 45
 
 func SavePath() (string, error) {
 	base, err := os.UserConfigDir()

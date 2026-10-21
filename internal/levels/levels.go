@@ -25,11 +25,13 @@ func All() []LevelInfo {
 		{"Sky Islands", "Floating islands above the clouds"},
 		{"Shadow Castle", "Dark halls and deadly traps"},
 		{"Crystal Dimension", "The final crystal world"},
+		{"Shadow Realm", "Invisible ghosts and dark magic"},
+		{"Volcanic Fury", "Lava, falling rocks and volcanic eruptions"},
 	}
 
-	result := make([]LevelInfo, 0, 35)
+	result := make([]LevelInfo, 0, 45)
 
-	for world := 1; world <= 7; world++ {
+	for world := 1; world <= 9; world++ {
 		for stage := 1; stage <= 5; stage++ {
 			result = append(result, LevelInfo{
 				Number:      (world-1)*5 + stage,
@@ -47,8 +49,8 @@ func Route(worldNumber, stage int) []PlatformSpec {
 	if worldNumber < 1 {
 		worldNumber = 1
 	}
-	if worldNumber > 7 {
-		worldNumber = 7
+	if worldNumber > 9 {
+		worldNumber = 9
 	}
 	if stage < 1 {
 		stage = 1
@@ -74,6 +76,10 @@ func Route(worldNumber, stage int) []PlatformSpec {
 		layouts = world06Layouts()
 	case 7:
 		layouts = world07Layouts()
+	case 8:
+		layouts = world08Layouts()
+	case 9:
+		layouts = world09Layouts()
 	}
 
 	return append([]PlatformSpec(nil), layouts[stage-1]...)

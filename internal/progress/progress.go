@@ -15,7 +15,7 @@ func Default() Progress {
 }
 
 func (p Progress) IsUnlocked(level int) bool {
-	return level >= 1 && level <= 35 && level <= p.UnlockedLevel
+	return level >= 1 && level <= 45 && level <= p.UnlockedLevel
 }
 
 func (p Progress) IsCompleted(level int) bool {

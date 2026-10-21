@@ -8,7 +8,7 @@ import (
 
 func TestThirtyFiveLevelsAreDefined(t *testing.T) {
 	got := levels.All()
-	if len(got) != 35 {
-		t.Fatalf("want 35 levels, got %d", len(got))
+	if len(got) != 45 {
+		t.Fatalf("want 45 levels, got %d", len(got))
 	}
 }

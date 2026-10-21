@@ -10,7 +10,7 @@ func DrawHUD(screen *ebiten.Image, worldNumber, level, attempts, maxAttempts, st
 		"HELWAN PENGUIN | WORLD "+itoa(worldNumber), 18, 16)
 
 	ebitenutil.DebugPrintAt(screen,
-		"Level: "+itoa(level)+"/35  Attempts: "+
+		"Level: "+itoa(level)+"/45  Attempts: "+
 			itoa(attempts)+"/"+itoa(maxAttempts)+
 			"  Stars: "+itoa(stars)+
 			"  Score: "+itoa(score), 18, 38)
