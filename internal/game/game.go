@@ -15,7 +15,7 @@ import (
 
 const (
 	screenWidth, screenHeight = 960, 540
-	maxAttempts               = 5
+	maxAttempts               = 5 // Normal-mode attempts; see attemptLimit.
 	maxLevel                  = 45
 )
 
@@ -29,6 +29,7 @@ type Game struct {
 	sound      *gameaudio.Manager
 	score      int
 	attempts   int
+	difficulty string // "easy", "normal", or "hard"
 	save       progress.Progress
 	saveError  string
 	infoPage   string
@@ -58,10 +59,61 @@ func New() *Game {
 		animation:  graphics.NewPenguinAnimation(),
 		sound:      gameaudio.NewManager(),
 		save:       saved,
+		difficulty: "normal",
 	}
 	g.startLevel(1)
 	g.state = StateMenu
 	return g
+}
+
+// attemptLimit returns the number of attempts available for each level.
+func (g *Game) attemptLimit() int {
+	switch g.difficulty {
+	case "easy":
+		return 10
+	case "hard":
+		return 3
+	default:
+		return maxAttempts
+	}
+}
+
+func (g *Game) enemySpeedMultiplier() float64 {
+	switch g.difficulty {
+	case "easy":
+		return 0.65
+	case "hard":
+		return 1.30
+	default:
+		return 1.0
+	}
+}
+
+func (g *Game) setDifficulty(difficulty string) {
+	switch difficulty {
+	case "easy", "normal", "hard":
+		if g.difficulty == difficulty {
+			return
+		}
+		g.difficulty = difficulty
+	default:
+		return
+	}
+
+	// Apply the selected mode immediately, even when changing it from Pause.
+	g.player.SetDifficulty(g.difficulty)
+	g.attempts = g.attemptLimit()
+}
+
+func (g *Game) difficultyLabel() string {
+	switch g.difficulty {
+	case "easy":
+		return "EASY"
+	case "hard":
+		return "HARD"
+	default:
+		return "NORMAL"
+	}
 }
 
 func (g *Game) startLevel(level int) {
@@ -72,7 +124,7 @@ func (g *Game) startLevel(level int) {
 		level = maxLevel
 	}
 
-	g.attempts = maxAttempts
+	g.attempts = g.attemptLimit()
 	g.resetCurrentLevel(level)
 
 	worldNumber := (level-1)/5 + 1
@@ -88,6 +140,7 @@ func (g *Game) resetCurrentLevel(level int) {
 		g.world = world.NewLevel(1)
 	}
 	g.player = player.New(55, g.world.Platforms[0].Y-38)
+	g.player.SetDifficulty(g.difficulty)
 	g.camera = Camera{}
 	g.animation = graphics.NewPenguinAnimation()
 	g.state = StatePlaying
@@ -133,6 +186,9 @@ func updateKeyHistory() {
 		ebiten.KeyO,
 		ebiten.KeyH,
 		ebiten.KeyF,
+		ebiten.Key1,
+		ebiten.Key2,
+		ebiten.Key3,
 	}
 	for _, key := range keys {
 		previousKeys[key] = ebiten.IsKeyPressed(key)
@@ -168,11 +224,6 @@ func (g *Game) fireWeapon() {
 		return
 	}
 
-	if g.score < world.ProjectileCost {
-		g.showMessage("Not enough points! Need 20 points to shoot.")
-		return
-	}
-
 	direction := float64(g.animation.Facing)
 	if direction == 0 {
 		direction = 1
@@ -186,7 +237,6 @@ func (g *Game) fireWeapon() {
 	y := g.player.Y + g.player.Height*0.45
 
 	if g.world.FireProjectile(x, y, direction) {
-		g.score -= world.ProjectileCost
 		if g.world.Number == 8 {
 			g.playSound("shoot")
 		} else {
@@ -277,6 +327,18 @@ func (g *Game) Update() error {
 
 	switch g.state {
 	case StateMenu:
+		if justPressed(ebiten.Key1) {
+			g.setDifficulty("easy")
+			return nil
+		}
+		if justPressed(ebiten.Key2) {
+			g.setDifficulty("normal")
+			return nil
+		}
+		if justPressed(ebiten.Key3) {
+			g.setDifficulty("hard")
+			return nil
+		}
 		if justPressed(ebiten.KeyN) {
 			g.startNewGame()
 			return nil
@@ -295,6 +357,19 @@ func (g *Game) Update() error {
 		return nil
 
 	case StatePaused:
+		// Difficulty can be changed at any time from the P pause menu.
+		if justPressed(ebiten.Key1) {
+			g.setDifficulty("easy")
+			return nil
+		}
+		if justPressed(ebiten.Key2) {
+			g.setDifficulty("normal")
+			return nil
+		}
+		if justPressed(ebiten.Key3) {
+			g.setDifficulty("hard")
+			return nil
+		}
 		if justPressed(ebiten.KeyN) {
 			g.startNewGame()
 			return nil
@@ -341,26 +416,23 @@ func (g *Game) Update() error {
 		return nil
 	}
 
-	// Remember ghost health so each defeated ghost costs 60 points.
-	previousGhostHealth := make([]int, len(g.world.Enemies))
+	previousEnemyX := make([]float64, len(g.world.Enemies))
 	for i := range g.world.Enemies {
-		if g.world.Enemies[i].Ghost {
-			previousGhostHealth[i] = g.world.Enemies[i].Health
-		}
+		previousEnemyX[i] = g.world.Enemies[i].X
 	}
 
 	g.world.Update(&g.player)
 
-	for i := range g.world.Enemies {
-		e := &g.world.Enemies[i]
-		if previousGhostHealth[i] > 0 &&
-			e.Ghost &&
-			e.Health <= 0 {
-			g.score -= world.GhostKillCost
-		}
-		if previousGhostHealth[i] > 0 &&
-			e.Stone {
-			g.score -= world.GhostKillCost
+	// Scale horizontal enemy movement for the selected difficulty.
+	// Easy mode slows enemies; hard mode makes them move faster.
+	enemySpeed := g.enemySpeedMultiplier()
+	if enemySpeed != 1 {
+		for i := range g.world.Enemies {
+			if i >= len(previousEnemyX) {
+				break
+			}
+			e := &g.world.Enemies[i]
+			e.X = previousEnemyX[i] + (e.X-previousEnemyX[i])*enemySpeed
 		}
 	}
 
@@ -550,27 +622,33 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		&g.animation)
 
 	graphics.DrawHUD(screen, g.world.Number, g.world.Level,
-		g.attempts, maxAttempts, g.world.CollectedCount(),
+		g.attempts, g.attemptLimit(), g.world.CollectedCount(),
 		g.score, g.saveError)
 
 	if g.infoPage != "" {
 		graphics.DrawInfo(screen, g.infoPage)
+		if g.infoPage == "help" {
+			ebitenutil.DebugPrintAt(screen,
+				"WORLDS 8 & 9 ONLY: F = Fireball in World 8 / Water in World 9.", 35, 485)
+			ebitenutil.DebugPrintAt(screen,
+				"Ghosts need 3 hits to defeat.", 35, 505)
+		}
 		return
 	}
 
 	switch g.state {
 	case StateMenu:
 		graphics.DrawOverlay(screen, "HELWAN PENGUIN",
-			"ENTER: Continue | N: New Game",
-			"O: About | H: Help | ESC: Quit")
+			"ENTER: Continue | N: New Game | O: About | H: Help",
+			"Mode: "+g.difficultyLabel()+" | 1: Easy | 2: Normal | 3: Hard | ESC: Quit")
 		ebitenutil.DebugPrintAt(screen,
 			"Unlocked: "+itoa(g.save.UnlockedLevel)+
 				"  Total stars: "+itoa(g.save.TotalStars), 340, 330)
 
 	case StatePaused:
 		graphics.DrawOverlay(screen, "PAUSED",
-			"P or ENTER: Resume | N: New Game",
-			"O: About | H: Help | ESC: Resume")
+			"1: Easy | 2: Normal | 3: Hard",
+			"Mode: "+g.difficultyLabel()+" | Attempts: "+itoa(g.attempts)+" | P/ENTER: Resume | N: New Game")
 
 	case StateLevelComplete:
 		graphics.DrawOverlay(screen, "LEVEL COMPLETE!",
@@ -579,7 +657,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case StateGameOver:
 		graphics.DrawOverlay(screen, "NO ATTEMPTS LEFT",
 			"Press ENTER to retry this level",
-			"A new game gives you 5 attempts")
+			"Difficulty: "+g.difficultyLabel()+" | N: New Game")
 
 	case StateGameWon:
 		graphics.DrawOverlay(screen, "CONGRATULATIONS!",
@@ -588,6 +666,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	default:
 		graphics.DrawControls(screen)
+	}
+
+	// The weapon is available only in worlds 8 and 9.
+	if g.state == StatePlaying && !g.tutorial {
+		if g.world.Number == 8 {
+			ebitenutil.DebugPrintAt(screen, "WORLD 8 ONLY: F = FIREBALL (3 hits per ghost)", 20, 505)
+		} else if g.world.Number == 9 {
+			ebitenutil.DebugPrintAt(screen, "WORLD 9 ONLY: F = WATER (3 hits per ghost)", 20, 505)
+		}
 	}
 
 	if g.world.Number == 9 && g.world.GasFrames > 0 {
@@ -603,12 +690,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if g.tutorialWorld == 8 {
 			graphics.DrawOverlay(screen,
 				"WORLD 8: SHADOW REALM",
-				"F: Fireballs cost 20 points each",
+				"F: Fireball - free to use in World 8 only",
 				"Ghosts need 3 hits; jumping on one kills you. ENTER to start")
 		} else if g.tutorialWorld == 9 {
 			graphics.DrawOverlay(screen,
 				"WORLD 9: VOLCANIC FURY",
-				"F: Water spray costs 20 points each",
+				"F: Water spray - free to use in World 9 only",
 				"Ghosts need 3 hits; green stones are deadly. Gas slows you for 5 seconds. ENTER to start")
 		}
 	}
